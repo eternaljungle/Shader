@@ -1,0 +1,61 @@
+#pragma kernel Init
+#pragma kernel Tick
+#define PARTICLE_SIZE 10
+#include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+struct Constants
+{
+    uint Capacity;
+    float3 SpherePosition;
+    float SphereRadius;
+}
+
+RWByteAddressBuffer Particles;
+
+float3 PointInSphere(const uint id, const float3 position, const float radius)
+{
+    const float4 random = float4(
+        GenerateHashedRandomFloat(id),
+        GenerateHashedRandomFloat(id + 1),
+        GenerateHashedRandomFloat(id + 2), 
+        GenerateHashedRandomFloat(id + 3));
+    const float3 direction = normalize(mad(random.xyz, 2.0f, -1.0f));
+    const float dist = pow(saturate(random.w), 0.3f) * radius;
+    return mad(direction, dist, position);
+}
+
+[numthreads(64, 1, 1)]
+void Init(const uint id : SV_DispatchThreadID)
+{
+    if (id >= Capacity) { return; }
+
+    const float3 position = PointInSphere(id, SpherePosition, SphereRadius);
+    const float3 velocity = float3(0.0f, 0.0f, 0.0f);
+    const float3 acceleration = float3(0.0f, 0.0f, 0.0f);
+    const float inertia = 0.7f;
+
+    Particles.Store3(mad(id, PARTICLE_SIZE, 0) << 2, asuint(position));
+    Particles.Store3(mad(id, PARTICLE_SIZE, 3) << 2,  asuint(velocity));
+    Particles.Store3(mad(id, PARTICLE_SIZE, 6) << 2,  asuint(acceleration));
+    Particles.Store(mad(id, PARTICLE_SIZE, 9) << 2,  asuint(inertia));
+}
+
+[numthreads(64, 1, 1)]
+void Tick(const uint id : SV_DispatchThreadID)
+{
+    if (id >= Capacity) { return; }
+
+    float3 position = asfloat(Particles.Load3(mad(id, PARTICLE_SIZE, 0) << 2));
+    float3 velocity = asfloat(Particles.Load3(mad(id, PARTICLE_SIZE, 3) << 2));
+    float3 acceleration = asfloat(Particles.Load3(mad(id, PARTICLE_SIZE, 6) << 2));
+    float intertia = asfloat(Particles.Load(mad(id, PARTICLE_SIZE, 9) << 2));
+
+    position += velocity * unity_DeltaTime.x;
+    velocity += acceleration * unity_DeltaTime.x;
+    acceleration = acceleration * intertia;
+
+    Particles.Store3(mad(id, PARTICLE_SIZE, 0) << 2,  asuint(position));
+    Particles.Store3(mad(id, PARTICLE_SIZE, 3) << 2,  asuint(velocity));
+    Particles.Store3(mad(id, PARTICLE_SIZE, 6) << 2,  asuint(acceleration));
+    Particles.Store(mad(id, PARTICLE_SIZE, 9) << 2,  asuint(intertia));
+}

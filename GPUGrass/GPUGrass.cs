@@ -12,8 +12,7 @@ namespace GPUGrass
         
         public float4 RootColor;
         public float4 TopColor;
-        public float2 XScaleParam;
-        public float2 YScaleParam;
+        public float4 ScaleParam;
         public uint Capacity;
         public float ScatterRange;
     }
@@ -33,7 +32,8 @@ namespace GPUGrass
     public class GPUGrass : MonoBehaviour
     {
         private const int MaxCapacity = 10000;
-        private static readonly int GrassBuffer = Shader.PropertyToID("GrassBuffer");
+        private static readonly int GrassBufferStore = Shader.PropertyToID("GrassBufferStore");
+                private static readonly int GrassBufferLoad = Shader.PropertyToID("GrassBufferLoad");
         private static readonly int CommandBuffer = Shader.PropertyToID("CommandBuffer");
         private static readonly int ConstantsProperty = Shader.PropertyToID("Constants");
 
@@ -109,29 +109,28 @@ namespace GPUGrass
 
             if (null == _commandBuffer || !_commandBuffer.IsValid()) _commandBuffer = NewCommandBuffer();
 
-            _constants[0].Capacity = (uint)capacity;
-            _constants[0].ScatterRange = scatterRange;
-            _constants[0].XScaleParam = xScalePram;
-            _constants[0].YScaleParam = yScalePram;
             _constants[0].RootColor = float4(rootColor.r, rootColor.g, rootColor.b, rootColor.a);
             _constants[0].TopColor = float4(topColor.r, topColor.g, topColor.b, topColor.a);
+            _constants[0].ScaleParam = float4(xScalePram, yScalePram);
+            _constants[0].Capacity = (uint)capacity;
+            _constants[0].ScatterRange = scatterRange;
             _constBuffer.SetData(_constants);
             _compute.SetConstantBuffer(ConstantsProperty, _constBuffer, 0, Constants.Size);
 
             var initKernelIndex = compute.FindKernel("Init");
-            _compute.SetBuffer(initKernelIndex, GrassBuffer, _grassBuffer);
+            _compute.SetBuffer(initKernelIndex, GrassBufferStore, _grassBuffer);
             _compute.SetBuffer(initKernelIndex, CommandBuffer, _commandBuffer);
             _compute.Dispatch(initKernelIndex, 1, 1, 1);
 
             _tickKernelIndex = compute.FindKernel("Tick");
-            _compute.SetBuffer(_tickKernelIndex, GrassBuffer, _grassBuffer);
+            _compute.SetBuffer(_tickKernelIndex, GrassBufferStore, _grassBuffer);
             _compute.SetBuffer(_tickKernelIndex, CommandBuffer, _commandBuffer);
             _threadGroupCount = (int)ceil(capacity / 64.0f);
 
             if (renderMaterial)
             {
                 _renderParams = new RenderParams(renderMaterial) { matProps = new MaterialPropertyBlock() };
-                _renderParams.matProps.SetBuffer(GrassBuffer, _grassBuffer);
+                _renderParams.matProps.SetBuffer(GrassBufferLoad, _grassBuffer);
             }
 
 #if UNITY_EDITOR
@@ -163,6 +162,7 @@ namespace GPUGrass
             if (renderMaterial)
             {
                 _renderParams.worldBounds = new Bounds(transform.position, Vector3.one * 100.0f);
+                _renderParams.matProps.SetVector("Position", transform.position);
                 Graphics.RenderPrimitivesIndirect(_renderParams, MeshTopology.Triangles, _commandBuffer);
             }
 

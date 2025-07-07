@@ -33,7 +33,7 @@ namespace GPUGrass
     {
         private const int MaxCapacity = 10000;
         private static readonly int GrassBufferStore = Shader.PropertyToID("GrassBufferStore");
-                private static readonly int GrassBufferLoad = Shader.PropertyToID("GrassBufferLoad");
+        private static readonly int GrassBufferLoad = Shader.PropertyToID("GrassBufferLoad");
         private static readonly int CommandBuffer = Shader.PropertyToID("CommandBuffer");
         private static readonly int ConstantsProperty = Shader.PropertyToID("Constants");
 

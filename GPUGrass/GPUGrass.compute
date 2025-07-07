@@ -2,20 +2,18 @@
 #pragma kernel Tick
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-#include "./GPUGrassCommon.hlsl"
 
 cbuffer Constants
 {
-    uint Capacity;
-    float ScatterRange;
-    float2 XScaleParam;
-    float2 YScaleParam;
     float4 RootColor;
     float4 TopColor;
+    float4 ScaleParam;
+    uint Capacity;
+    float ScatterRange;
 }
 
-RWByteAddressBuffer GrassBuffer;
 RWByteAddressBuffer CommandBuffer;
+#include "./GPUGrassCommon.hlsl"
 
 [numthreads(1, 1, 1)]
 void Init()
@@ -28,19 +26,16 @@ void Tick(const uint id : SV_DispatchThreadID)
 {
     if (id >= Capacity) { return; }
 
+    Grass grass;
     const float x = mad(GenerateHashedRandomFloat(id + 0), ScatterRange, ScatterRange * 0.5f);
     const float z = mad(GenerateHashedRandomFloat(id + 2), ScatterRange, ScatterRange * 0.5f);
-    const float rotation = mad(GenerateHashedRandomFloat(id + 3), TWO_PI, -PI);
-    const float scaleX = mad(GenerateHashedRandomFloat(id + 4), XScaleParam.x, XScaleParam.y);
-    const float scaleY = mad(GenerateHashedRandomFloat(id + 5), YScaleParam.x, YScaleParam.y);
-    const float bend = GenerateHashedRandomFloat(id + 6);
+    grass.position = float3(x, 0.0f, z);
 
-    uint rootColorPacked = PackColor(RootColor);
-    uint topColorPacked = PackColor(TopColor);
-    const uint2 colors = uint2(rootColorPacked, topColorPacked);
-    
-    GrassBuffer.Store4(mad(id, GRASS_BUFFER_SIZE, 0) << 2, asuint(float4(x, 0.0f, z, rotation)));
-    GrassBuffer.Store2(mad(id, GRASS_BUFFER_SIZE, 4) << 2, asuint(float2(scaleX, scaleY)));
-    GrassBuffer.Store(mad(id, GRASS_BUFFER_SIZE, 5) << 2, asuint(bend));
-    GrassBuffer.Store2(mad(id, GRASS_BUFFER_SIZE, 7) << 2, asuint(colors));  
+    grass.rotation = mad(GenerateHashedRandomFloat(id + 3), TWO_PI, -PI);
+    grass.scale.x = mad(GenerateHashedRandomFloat(id + 4), ScaleParam.x, ScaleParam.y);
+    grass.scale.y = mad(GenerateHashedRandomFloat(id + 5), ScaleParam.z, ScaleParam.w);
+    grass.bend = GenerateHashedRandomFloat(id + 6);
+    grass.colors = uint2(PackColor(RootColor), PackColor(TopColor));
+
+    StoreGrass(grass, id);
 }

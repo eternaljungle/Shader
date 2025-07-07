@@ -1,5 +1,9 @@
 Shader "GPU Grass"
 {
+    Properties
+    {
+        Position ("Position", Vector) = (0, 0, 0)
+    }
     SubShader
     {
         ZWrite On
@@ -7,8 +11,7 @@ Shader "GPU Grass"
         {
             HLSLPROGRAM
             #pragma vertex Vert
-            #pragma fragment Frag
-            #include "./GPUGrassCommon.hlsl"    
+            #pragma fragment Frag 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             struct Attribute
@@ -23,7 +26,12 @@ Shader "GPU Grass"
 
             };
 
-            ByteAddressBuffer GrassBuffer;
+            cbuffer UnityPerMaterial
+            {
+                float3 Position;
+            }
+
+            #include "./GPUGrassCommon.hlsl"   
 
             static float4 grassMesh[VERTEX_PER_BLADE] =
             {
@@ -41,27 +49,21 @@ Shader "GPU Grass"
                 const uint globalVertexID = input.vertexID;
                 const uint bladeID = uint(floor(globalVertexID / VERTEX_PER_BLADE));
                 const uint localVertex = globalVertexID % VERTEX_PER_BLADE;
-                const float4 bladePositionRotation = asfloat(GrassBuffer.Load4(mad(bladeID, GRASS_BUFFER_SIZE, 0) << 2));
-                const float2 bladeScale = asfloat(GrassBuffer.Load2(mad(bladeID, GRASS_BUFFER_SIZE, 4) << 2));
-                const float bladeBend = asfloat(GrassBuffer.Load(mad(bladeID, GRASS_BUFFER_SIZE, 5) << 2));
-                const uint2 bladeColors = asuint(GrassBuffer.Load2(mad(bladeID, GRASS_BUFFER_SIZE, 7) << 2));
-                
-                const float3 bladePosition = bladePositionRotation.xyz;
-                const float bladeRotaion = bladePositionRotation.w;
+                const Grass grass = LoadGrass(bladeID);
 
                 float4 vertexAttribute = grassMesh[localVertex];
-                vertexAttribute.xy *= bladeScale.xy;
+                vertexAttribute.xy *= grass.scale;
 
-                vertexAttribute.z += pow(vertexAttribute.w, 3.0f) * bladeBend;
+                vertexAttribute.z += pow(vertexAttribute.w, 3.0f) * grass.bend;
                 
-                float s = sin(bladeRotaion);
-                float c = cos(bladeRotaion);
+                float s = sin(grass.rotation);
+                float c = cos(grass.rotation);
                 float2x2 rotationMatrix = float2x2(s, c, -c, s);
                 vertexAttribute.xz = mul(rotationMatrix, vertexAttribute.xz);
 
                 Varyings output;
-                output.positionCS = TransformWorldToHClip(bladePosition.xyz + vertexAttribute.xyz);
-                output.color = lerp(UnPackColor(bladeColors.x), UnPackColor(bladeColors.y), vertexAttribute.w); 
+                output.positionCS = TransformWorldToHClip(Position + grass.position + vertexAttribute.xyz);
+                output.color = lerp(UnPackColor(grass.colors.x), UnPackColor(grass.colors.y), vertexAttribute.w); 
                 return output;
             }
 

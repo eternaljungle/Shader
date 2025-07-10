@@ -17,7 +17,7 @@ struct Ray
     float3 direction;
 };
 
-float DistanceToSphere(const float3 p, const float3 center, const float radius)
+/*float DistanceToSphere(const float3 p, const float3 center, const float radius)
 {
     return distance(p, center) - radius;
 }
@@ -33,6 +33,43 @@ float SDFVolume(float3 p)
     const float ds = DistanceToSphere(p, float3(-0.2f, 0.0f, 0.0f), 0.4f);
     const float dc = DistanceToCube(p, float3(0.2f, 0.0f, 0.0f), float3(0.3f, 0.2f, 0.3f));
     return min(ds, dc);
+}*/
+
+// HLSL-compatible hash, noise, fbm
+
+float hash(float n) {
+    return frac(sin(n) * 43758.5453);
+}
+
+float noise(float3 x) {
+    float3 p = floor(x);
+    float3 f = frac(x);
+    f = f * f * (3.0 - 2.0 * f);
+
+    float n = p.x + p.y * 57.0 + 113.0 * p.z;
+
+    float res = lerp(
+        lerp(lerp(hash(n + 0.0), hash(n + 1.0), f.x),
+             lerp(hash(n + 57.0), hash(n + 58.0), f.x), f.y),
+        lerp(lerp(hash(n + 113.0), hash(n + 114.0), f.x),
+             lerp(hash(n + 170.0), hash(n + 171.0), f.x), f.y), f.z);
+
+    return res;
+}
+
+
+float fbm(float3 p) {
+    float f = 0.0;
+    f += 0.5000 * noise(p);      p *= 2.02;
+    f += 0.2500 * noise(p);      p *= 2.03;
+    f += 0.1250 * noise(p);      p *= 2.01;
+    return f;
+}
+
+float SDFVolume(float3 p)
+{
+    float density = fbm(p * 3.0) - 0.5;
+    return density;
 }
 
 float VolumeMarch(Ray ray)
@@ -43,11 +80,10 @@ float VolumeMarch(Ray ray)
     {
         float3 p = mad(ray.direction, t, ray.origin);
         float d = SDFVolume(p);
-        if (d < 0.0f) { acc += 0.03f; }
+        if (d > 0.0f) { acc += d * 0.09f; }
         t += 0.01f;
     }
-
-    return acc;
+    return saturate(acc);
 }
 
 uniform float Angle;

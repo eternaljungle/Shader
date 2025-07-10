@@ -17,25 +17,8 @@ struct Ray
     float3 direction;
 };
 
-/*float DistanceToSphere(const float3 p, const float3 center, const float radius)
-{
-    return distance(p, center) - radius;
-}
-
-float DistanceToCube(const float3 p, const float3 center, const float3 extent)
-{
-    const float3 q = abs(p - center) - extent;
-    return length(max(q.xyz, 0.0f)) + min(max(max(q.x, q.y), q.z), 0.0f);
-}
-         
-float SDFVolume(float3 p)
-{
-    const float ds = DistanceToSphere(p, float3(-0.2f, 0.0f, 0.0f), 0.4f);
-    const float dc = DistanceToCube(p, float3(0.2f, 0.0f, 0.0f), float3(0.3f, 0.2f, 0.3f));
-    return min(ds, dc);
-}*/
-
 // HLSL-compatible hash, noise, fbm
+// https://www.shadertoy.com/view/lss3zr 참고
 
 float hash(float n) {
     return frac(sin(n) * 43758.5453);
